@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id          String     @id @default(uuid())
+  ownerId     String // Cognito User ID
+  title       String
+  description String?
+  feedbacks   Feedback[]
+}
+
+model FeedbackStatus {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  feedbacks   Feedback[]
+}
+
+model FeedbackCategory {
+  id        String     @id @default(uuid())
+  name      String
+  feedbacks Feedback[]
+}
+
+model Feedback {
+  id                 String            @id @default(uuid())
+  userId             String // Cognito User ID
+  productId          String
+  title              String
+  feedbackCategoryId String
+  feedbackStatusId   String
+  details            String?
+  comments           FeedbackComment[]
+
+  product          Product          @relation(fields: [productId], references: [id])
+  feedbackCategory FeedbackCategory @relation(fields: [feedbackCategoryId], references: [id])
+  feedbackStatus   FeedbackStatus   @relation(fields: [feedbackStatusId], references: [id])
+  Upvote           Upvote[]
+}
+
+model FeedbackComment {
+  id         String                 @id @default(uuid())
+  userId     String // Cognito User ID
+  feedbackId String
+  comment    String
+  replies    FeedbackCommentReply[]
+
+  feedback Feedback @relation(fields: [feedbackId], references: [id])
+}
+
+model FeedbackCommentReply {
+  id                String  @id @default(uuid())
+  userId            String // Cognito User ID
+  feedbackCommentId String
+  taggedUserId      String? // Cognito User ID, optional
+  comment           String
+
+  feedbackComment FeedbackComment @relation(fields: [feedbackCommentId], references: [id])
+}
+
+model Upvote {
+  id         String @id @default(uuid())
+  userId     String // Cognito User ID
+  feedbackId String
+
+  feedback Feedback @relation(fields: [feedbackId], references: [id])
+}

@@ -1,0 +1,101 @@
+type Product @aws_cognito_user_pools {
+  id: ID!
+  ownerId: String!
+  title: String!
+  description: String
+  feedbacks: [Feedback!]!
+}
+
+type FeedbackStatus @aws_cognito_user_pools {
+  id: ID!
+  name: String!
+  description: String
+  feedbacks: [Feedback!]!
+}
+
+type FeedbackCategory @aws_cognito_user_pools {
+  id: ID!
+  name: String!
+  feedbacks: [Feedback!]!
+}
+
+type Feedback @aws_cognito_user_pools {
+  id: ID!
+  userId: String!
+  productId: String!
+  title: String!
+  feedbackCategoryId: String!
+  feedbackStatusId: String!
+  details: String
+  comments: [FeedbackComment!]!
+  product: Product!
+  feedbackCategory: FeedbackCategory!
+  feedbackStatus: FeedbackStatus!
+  upvotes: [Upvote!]!
+}
+
+type FeedbackComment @aws_cognito_user_pools {
+  id: ID!
+  userId: String!
+  feedbackId: String!
+  comment: String!
+  replies: [FeedbackCommentReply!]!
+  feedback: Feedback!
+}
+
+type FeedbackCommentReply @aws_cognito_user_pools {
+  id: ID!
+  userId: String!
+  feedbackCommentId: String!
+  taggedUserId: String
+  comment: String!
+  feedbackComment: FeedbackComment!
+}
+
+type Upvote @aws_cognito_user_pools {
+  id: ID!
+  userId: String!
+  feedbackId: String!
+  feedback: Feedback!
+}
+
+input CreateProductInput {
+  title: String!
+  description: String
+}
+
+input CreateFeedbackInput {
+  productId: String!
+  title: String!
+  feedbackCategoryId: String!
+  feedbackStatusId: String!
+  details: String
+}
+
+input FeedbackByProductIdInput {
+  productId: String!
+}
+
+input CreateFeedbackStatusInput {
+  name: String!
+  description: String
+}
+input CreateFeedbackCategoryInput {
+  name: String!
+  description: String
+}
+
+# Query and Mutation definitions
+type Query @aws_cognito_user_pools {
+  getAllProducts: [Product!]!
+  getAllFeedbacksByProductId(data: FeedbackByProductIdInput): [Feedback!]!
+}
+
+type Mutation @aws_cognito_user_pools {
+  # Define mutations to modify data, for example:
+  createProduct(data: CreateProductInput): Product!
+  createFeedback(data: CreateFeedbackInput): Feedback!
+  createFeedbackStatus(data: CreateFeedbackStatusInput): FeedbackStatus!
+  createFeedbackCategory(data: CreateFeedbackCategoryInput): FeedbackCategory!
+  # Add other mutations as needed
+}
