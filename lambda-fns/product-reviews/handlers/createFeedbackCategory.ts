@@ -1,5 +1,4 @@
 import { FeedbackCategory, PrismaClient } from '@prisma/client';
-import { HandlerError } from '../errors';
 
 export async function createFeedbackCategory(
   prisma: PrismaClient,
@@ -12,7 +11,7 @@ export async function createFeedbackCategory(
   });
 
   if (feedbackCategory) {
-    throw new HandlerError('Feedback category already exists', 400);
+    throw new Error('Feedback category already exists');
   }
 
   return await prisma.feedbackCategory.create({

@@ -1,5 +1,4 @@
 import { FeedbackStatus, PrismaClient } from '@prisma/client';
-import { HandlerError } from '../errors';
 
 export async function createFeedbackStatus(
   prisma: PrismaClient,
@@ -12,7 +11,7 @@ export async function createFeedbackStatus(
   });
 
   if (feedbackStatus) {
-    throw new HandlerError('Feedback status already exists', 400);
+    throw new Error('Feedback status already exists');
   }
 
   return await prisma.feedbackStatus.create({

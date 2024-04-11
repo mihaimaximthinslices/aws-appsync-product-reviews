@@ -15,7 +15,7 @@ datasource db {
 
 model Product {
   id          String     @id @default(uuid())
-  ownerId     String // Cognito User ID
+  userId      String // Cognito User ID
   title       String
   description String?
   feedbacks   Feedback[]
@@ -76,4 +76,6 @@ model Upvote {
   feedbackId String
 
   feedback Feedback @relation(fields: [feedbackId], references: [id])
+
+  @@unique([userId, feedbackId])
 }

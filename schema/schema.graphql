@@ -1,6 +1,11 @@
+type UserInformation @aws_cognito_user_pools {
+  userId: ID!
+  email: String!
+}
+
 type Product @aws_cognito_user_pools {
   id: ID!
-  ownerId: String!
+  userId: String!
   title: String!
   description: String
   feedbacks: [Feedback!]!
@@ -85,10 +90,35 @@ input CreateFeedbackCategoryInput {
   description: String
 }
 
-# Query and Mutation definitions
+input CreateFeedbackCommentInput {
+  feedbackId: String!
+  comment: String!
+}
+
+input CreateFeedbackCommentReplyInput {
+  feedbackCommentId: String!
+  taggedUserId: String
+  comment: String!
+}
+
+input UserInformationInput {
+  userId: ID!
+}
+
+input CreateFeedbackUpvoteInput {
+  feedbackId: String!
+}
+
+input DeleteFeedbackUpvoteInput {
+  feedbackId: String!
+}
+
 type Query @aws_cognito_user_pools {
+  getUserInformationById(data: UserInformationInput): UserInformation!
   getAllProducts: [Product!]!
   getAllFeedbacksByProductId(data: FeedbackByProductIdInput): [Feedback!]!
+  getAllFeedbackStatuses: [FeedbackStatus!]!
+  getAllFeedbackCategories: [FeedbackCategory!]!
 }
 
 type Mutation @aws_cognito_user_pools {
@@ -97,5 +127,10 @@ type Mutation @aws_cognito_user_pools {
   createFeedback(data: CreateFeedbackInput): Feedback!
   createFeedbackStatus(data: CreateFeedbackStatusInput): FeedbackStatus!
   createFeedbackCategory(data: CreateFeedbackCategoryInput): FeedbackCategory!
-  # Add other mutations as needed
+  createFeedbackComment(data: CreateFeedbackCommentInput): FeedbackComment!
+  createFeedbackCommentReply(
+    data: CreateFeedbackCommentReplyInput
+  ): FeedbackCommentReply!
+  createFeedbackUpvote(data: CreateFeedbackUpvoteInput): Upvote!
+  deleteFeedbackUpvote(data: DeleteFeedbackUpvoteInput): Upvote!
 }

@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.552.0",
     "@prisma/client": "^5.12.1",
     "prisma": "^5.12.1"
   },

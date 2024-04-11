@@ -4,6 +4,7 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as rds from 'aws-cdk-lib/aws-rds';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { config } from 'dotenv';
 
@@ -15,6 +16,29 @@ export class AwsAppsyncStack extends cdk.Stack {
 
     const vpc = new ec2.Vpc(this, 'VPC');
 
+    const securityGroup = this.configureSecuritygroup(vpc);
+
+    const db = this.configureRdsDatabase(vpc, securityGroup);
+
+    const { userPool, userPoolClient } = this.configureUserPool();
+
+    const api = this.configureGraphQlApi(userPool);
+
+    const { userQueriesLambda, productReviewsLambdaDs } =
+      this.configureProductReviewsLambda(vpc, securityGroup, db, api);
+
+    const userQueriesLambdaDs = this.configureUserQueriesLambda(
+      userQueriesLambda,
+      userPool,
+      api,
+    );
+
+    this.configureGraphQlResolvers(productReviewsLambdaDs, userQueriesLambdaDs);
+
+    this.logInstances(api, userPool, userPoolClient, db);
+  }
+  
+  private configureSecuritygroup(vpc: cdk.aws_ec2.Vpc) {
     const securityGroup = new ec2.SecurityGroup(
       this,
       'product-reviews-db-security-group',
@@ -28,8 +52,14 @@ export class AwsAppsyncStack extends cdk.Stack {
       ec2.Port.tcp(5432), // Assuming PostgreSQL. Adjust the port if using a different database engine.
       'Allow inbound traffic from my IP address on port 5432',
     );
+    return securityGroup;
+  }
 
-    const db = new rds.DatabaseInstance(this, 'DB', {
+  private configureRdsDatabase(
+    vpc: cdk.aws_ec2.Vpc,
+    securityGroup: cdk.aws_ec2.SecurityGroup,
+  ) {
+    return new rds.DatabaseInstance(this, 'DB', {
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_13,
       }),
@@ -44,7 +74,9 @@ export class AwsAppsyncStack extends cdk.Stack {
       },
       securityGroups: [securityGroup],
     });
+  }
 
+  private configureUserPool() {
     const userPool = new cognito.UserPool(this, 'product-reviews-user-pool', {
       selfSignUpEnabled: true,
       accountRecovery: cognito.AccountRecovery.PHONE_AND_EMAIL,
@@ -65,28 +97,30 @@ export class AwsAppsyncStack extends cdk.Stack {
       'product-reviews-user-pool-client',
       { userPool },
     );
+    return { userPool, userPoolClient };
+  }
 
-    const api = new appsync.GraphqlApi(this, 'product-reviews-api', {
+  private configureGraphQlApi(userPool: cdk.aws_cognito.UserPool) {
+    return new appsync.GraphqlApi(this, 'product-reviews-api', {
       name: 'api-to-process-product-reviews',
       schema: appsync.SchemaFile.fromAsset('schema/schema.graphql'),
       authorizationConfig: {
         defaultAuthorization: {
-          authorizationType: appsync.AuthorizationType.API_KEY,
-          apiKeyConfig: {
-            expires: cdk.Expiration.after(cdk.Duration.days(365)),
+          authorizationType: appsync.AuthorizationType.USER_POOL,
+          userPoolConfig: {
+            userPool,
           },
         },
-        additionalAuthorizationModes: [
-          {
-            authorizationType: appsync.AuthorizationType.USER_POOL,
-            userPoolConfig: {
-              userPool,
-            },
-          },
-        ],
       },
     });
+  }
 
+  private configureProductReviewsLambda(
+    vpc: cdk.aws_ec2.Vpc,
+    securityGroup: cdk.aws_ec2.SecurityGroup,
+    db: cdk.aws_rds.DatabaseInstance,
+    api: cdk.aws_appsync.GraphqlApi,
+  ) {
     const productReviewsLambda = new lambda.Function(
       this,
       'product-reviews-lambda',
@@ -98,46 +132,116 @@ export class AwsAppsyncStack extends cdk.Stack {
           subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
         },
         securityGroups: [securityGroup],
-        code: lambda.Code.fromAsset('lambda-fns'),
+        code: lambda.Code.fromAsset('lambda-fns/product-reviews'),
         memorySize: 1024,
+        timeout: cdk.Duration.minutes(5),
       },
     );
 
-    productReviewsLambda.addEnvironment(
-      'DB_HOST',
-      db.dbInstanceEndpointAddress,
-    );
-    productReviewsLambda.addEnvironment('DB_PORT', db.dbInstanceEndpointPort);
-    productReviewsLambda.addEnvironment(
-      'DB_HOST',
-      db.instanceEndpoint.hostname,
-    );
-    console.log(
-      'DB_ENV_VARS',
-      process.env.DB_USERNAME,
-      process.env.DB_PASSWORD,
-    );
+    db.connections.allowFrom(securityGroup, ec2.Port.tcp(5432));
 
     productReviewsLambda.addEnvironment(
-      'DB_USERNAME',
-      process.env.DB_USERNAME || '',
-    );
-    productReviewsLambda.addEnvironment(
-      'DB_PASSWORD',
-      process.env.DB_PASSWORD || '',
+      'DATABASE_URL',
+      process.env.DATABASE_URL || '',
     );
 
-    const lambdaDs = api.addLambdaDataSource(
+    const productReviewsLambdaDs = api.addLambdaDataSource(
       'lambdaDatasource',
       productReviewsLambda,
     );
 
-    new cdk.CfnOutput(this, 'GraphQLAPIURL', {
-      value: api.graphqlUrl,
+    const userQueriesLambda = new lambda.Function(
+      this,
+      'product-reviews-lambda-user-queries',
+      {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        handler: 'main.handler',
+        vpc: vpc,
+        vpcSubnets: {
+          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        },
+        securityGroups: [securityGroup],
+        code: lambda.Code.fromAsset('lambda-fns/user-queries'),
+        memorySize: 1024,
+        timeout: cdk.Duration.minutes(5),
+      },
+    );
+    return { userQueriesLambda, productReviewsLambdaDs };
+  }
+
+  private configureUserQueriesLambda(
+    userQueriesLambda: cdk.aws_lambda.Function,
+    userPool: cdk.aws_cognito.UserPool,
+    api: cdk.aws_appsync.GraphqlApi,
+  ) {
+    const userPoolArn = `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/${userPool.userPoolId}`;
+
+    userQueriesLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['cognito-idp:ListUsers'],
+        resources: [userPoolArn],
+      }),
+    );
+
+    userQueriesLambda.addEnvironment('USER_POOL_ID', userPool.userPoolId);
+
+    const userQueriesLambdaDs = api.addLambdaDataSource(
+      'userQueriesLambaDatasource',
+      userQueriesLambda,
+    );
+    return userQueriesLambdaDs;
+  }
+
+  private configureGraphQlResolvers(
+    productReviewsLambdaDs: cdk.aws_appsync.LambdaDataSource,
+    userQueriesLambdaDs: cdk.aws_appsync.LambdaDataSource,
+  ) {
+    const mutations = [
+      'createProduct',
+      'createFeedbackCategory',
+      'createFeedbackStatus',
+      'createFeedback',
+      'createFeedbackComment',
+      'createFeedbackCommentReply',
+      'createFeedbackUpvote',
+      'deleteFeedbackUpvote',
+    ];
+    const queries = [
+      'getAllProducts',
+      'getAllFeedbacksByProductId',
+      'getAllFeedbackStatuses',
+      'getAllFeedbackCategories',
+    ];
+
+    mutations.forEach((mutation) => {
+      productReviewsLambdaDs.createResolver(`${mutation}Resolver`, {
+        typeName: 'Mutation',
+        fieldName: mutation,
+      });
     });
 
-    new cdk.CfnOutput(this, 'GraphQLAPIKey', {
-      value: api.apiKey || '',
+    queries.forEach((query) => {
+      productReviewsLambdaDs.createResolver(`${query}Resolver`, {
+        typeName: 'Query',
+        fieldName: query,
+      });
+    });
+
+    userQueriesLambdaDs.createResolver('getUserInformationByIdResolver', {
+      typeName: 'Query',
+      fieldName: 'getUserInformationById',
+    });
+  }
+
+  private logInstances(
+    api: cdk.aws_appsync.GraphqlApi,
+    userPool: cdk.aws_cognito.UserPool,
+    userPoolClient: cdk.aws_cognito.UserPoolClient,
+    db: cdk.aws_rds.DatabaseInstance,
+  ) {
+    new cdk.CfnOutput(this, 'GraphQLAPIURL', {
+      value: api.graphqlUrl,
     });
 
     new cdk.CfnOutput(this, 'Stack Region', {
@@ -153,35 +257,5 @@ export class AwsAppsyncStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'DBHost', { value: db.dbInstanceEndpointAddress });
-
-    lambdaDs.createResolver('createProductResolver', {
-      typeName: 'Mutation',
-      fieldName: 'createProduct',
-    });
-
-    lambdaDs.createResolver('createFeedbackCategoryResolver', {
-      typeName: 'Mutation',
-      fieldName: 'createFeedbackCategory',
-    });
-
-    lambdaDs.createResolver('createFeedbackStatusResolver', {
-      typeName: 'Mutation',
-      fieldName: 'createFeedbackStatus',
-    });
-
-    lambdaDs.createResolver('createFeedbackResolver', {
-      typeName: 'Mutation',
-      fieldName: 'createFeedback',
-    });
-
-    lambdaDs.createResolver('getAllProductsResolver', {
-      typeName: 'Query',
-      fieldName: 'getAllProducts',
-    });
-
-    lambdaDs.createResolver('getAllFeedbacksByProductIdResolver', {
-      typeName: 'Query',
-      fieldName: 'getAllFeedbacksByProductId',
-    });
   }
 }

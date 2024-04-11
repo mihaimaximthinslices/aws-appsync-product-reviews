@@ -5,11 +5,16 @@ import {
   createProduct,
   getAllProducts,
   getAllFeedbacksByProductId,
+  getAllFeedbackCategories,
+  getAllFeedbackStatuses,
+  createFeedbackComment,
+  createFeedbackCommentReply,
+  createFeedbackUpvote,
+  deleteFeedbackUpvote,
 } from './handlers';
 import { createFeedback } from './handlers';
 
 const prisma = new PrismaClient();
-
 exports.handler = async (event: any) => {
   const {
     arguments: { data },
@@ -43,6 +48,30 @@ exports.handler = async (event: any) => {
 
     case 'getAllFeedbacksByProductId':
       return getAllFeedbacksByProductId(prisma, data.productId);
+
+    case 'getAllFeedbackCategories':
+      return getAllFeedbackCategories(prisma);
+
+    case 'getAllFeedbackStatuses':
+      return getAllFeedbackStatuses(prisma);
+
+    case 'createFeedbackComment':
+      return createFeedbackComment(prisma, {
+        ...data,
+        userId: sub,
+      });
+
+    case 'createFeedbackCommentReply':
+      return createFeedbackCommentReply(prisma, {
+        ...data,
+        userId: sub,
+      });
+
+    case 'createFeedbackUpvote':
+      return createFeedbackUpvote(prisma, { ...data, userId: sub });
+
+    case 'deleteFeedbackUpvote':
+      return deleteFeedbackUpvote(prisma, { ...data, userId: sub });
 
     default:
       return null;

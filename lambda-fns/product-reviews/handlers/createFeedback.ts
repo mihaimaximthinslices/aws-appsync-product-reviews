@@ -1,5 +1,4 @@
 import { Feedback, PrismaClient } from '@prisma/client';
-import { HandlerError } from '../errors';
 
 export async function createFeedback(prisma: PrismaClient, data: Feedback) {
   const feedbackCategory = prisma.feedbackCategory.findFirst({
@@ -20,7 +19,7 @@ export async function createFeedback(prisma: PrismaClient, data: Feedback) {
   ]);
 
   if (!feedbackCategoryResult || !feedbackStatusResult) {
-    throw new HandlerError('Feedback category or status not found', 404);
+    throw new Error('Feedback category or status not found');
   }
 
   return await prisma.feedback.create({

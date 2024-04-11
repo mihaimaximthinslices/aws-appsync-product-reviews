@@ -11,6 +11,12 @@ export async function getAllFeedbacksByProductId(
     include: {
       feedbackCategory: true,
       feedbackStatus: true,
+      Upvote: true,
+      comments: {
+        include: {
+          replies: true,
+        },
+      },
     },
   });
 }
