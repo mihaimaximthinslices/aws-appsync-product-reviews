@@ -122,7 +122,6 @@ type Query @aws_cognito_user_pools {
 }
 
 type Mutation @aws_cognito_user_pools {
-  # Define mutations to modify data, for example:
   createProduct(data: CreateProductInput): Product!
   createFeedback(data: CreateFeedbackInput): Feedback!
   createFeedbackStatus(data: CreateFeedbackStatusInput): FeedbackStatus!

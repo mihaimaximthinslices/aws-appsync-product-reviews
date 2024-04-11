@@ -5,6 +5,10 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+
 import { Construct } from 'constructs';
 import { config } from 'dotenv';
 
@@ -35,9 +39,55 @@ export class AwsAppsyncStack extends cdk.Stack {
 
     this.configureGraphQlResolvers(productReviewsLambdaDs, userQueriesLambdaDs);
 
-    this.logInstances(api, userPool, userPoolClient, db);
+    const { siteBucket, cloudfrontDistribution } =
+      this.configureFrontendHosting();
+
+    this.logStuff(
+      api,
+      userPool,
+      userPoolClient,
+      db,
+      siteBucket,
+      cloudfrontDistribution,
+    );
   }
-  
+
+  private configureFrontendHosting() {
+    const siteBucket = new s3.Bucket(this, 'SiteBucket', {
+      bucketName: 'product-reviews-site-bucket',
+      websiteIndexDocument: 'index.html',
+      websiteErrorDocument: 'index.html',
+      publicReadAccess: true,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
+      accessControl: s3.BucketAccessControl.BUCKET_OWNER_FULL_CONTROL,
+    });
+
+    new s3deploy.BucketDeployment(this, 'DeployWebsite', {
+      sources: [s3deploy.Source.asset('frontend/dist')],
+      destinationBucket: siteBucket,
+    });
+
+    const cloudfrontDistribution = new cloudfront.CloudFrontWebDistribution(
+      this,
+      'SiteDistribution',
+      {
+        originConfigs: [
+          {
+            s3OriginSource: {
+              s3BucketSource: siteBucket,
+            },
+            behaviors: [{ isDefaultBehavior: true }],
+          },
+        ],
+      },
+    );
+
+    return {
+      siteBucket,
+      cloudfrontDistribution,
+    };
+  }
+
   private configureSecuritygroup(vpc: cdk.aws_ec2.Vpc) {
     const securityGroup = new ec2.SecurityGroup(
       this,
@@ -234,11 +284,13 @@ export class AwsAppsyncStack extends cdk.Stack {
     });
   }
 
-  private logInstances(
+  private logStuff(
     api: cdk.aws_appsync.GraphqlApi,
     userPool: cdk.aws_cognito.UserPool,
     userPoolClient: cdk.aws_cognito.UserPoolClient,
     db: cdk.aws_rds.DatabaseInstance,
+    siteBucket: cdk.aws_s3.Bucket,
+    cloudfrontDistribution: cdk.aws_cloudfront.CloudFrontWebDistribution,
   ) {
     new cdk.CfnOutput(this, 'GraphQLAPIURL', {
       value: api.graphqlUrl,
@@ -257,5 +309,13 @@ export class AwsAppsyncStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'DBHost', { value: db.dbInstanceEndpointAddress });
+
+    new cdk.CfnOutput(this, 'S3 Bucket site url', {
+      value: siteBucket.bucketWebsiteUrl,
+    });
+
+    new cdk.CfnOutput(this, 'Cloudfrount distribution site url', {
+      value: cloudfrontDistribution.distributionDomainName,
+    });
   }
 }

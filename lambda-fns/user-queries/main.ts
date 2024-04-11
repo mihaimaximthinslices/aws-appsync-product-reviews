@@ -19,7 +19,7 @@ exports.handler = async (event: any) => {
 
 async function getUser(userId: string, userPoolId: string) {
   const params = {
-    UserPoolId: process.env.USER_POOL_ID || '',
+    UserPoolId: userPoolId,
     Filter: `sub = "${userId}"`,
   };
 

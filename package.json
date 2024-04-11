@@ -6,9 +6,11 @@
   },
   "scripts": {
     "build": "tsc",
+    "build:fe": "cd frontend && npx vite build",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk"
+    "cdk": "cdk",
+    "deploy": "npm run build:fe && npm run build && cdk deploy --profile personal"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
