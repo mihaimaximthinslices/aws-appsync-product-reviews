@@ -52,42 +52,6 @@ export class AwsAppsyncStack extends cdk.Stack {
     );
   }
 
-  private configureFrontendHosting() {
-    const siteBucket = new s3.Bucket(this, 'SiteBucket', {
-      bucketName: 'product-reviews-site-bucket',
-      websiteIndexDocument: 'index.html',
-      websiteErrorDocument: 'index.html',
-      publicReadAccess: true,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
-      accessControl: s3.BucketAccessControl.BUCKET_OWNER_FULL_CONTROL,
-    });
-
-    new s3deploy.BucketDeployment(this, 'DeployWebsite', {
-      sources: [s3deploy.Source.asset('frontend/dist')],
-      destinationBucket: siteBucket,
-    });
-
-    const cloudfrontDistribution = new cloudfront.CloudFrontWebDistribution(
-      this,
-      'SiteDistribution',
-      {
-        originConfigs: [
-          {
-            s3OriginSource: {
-              s3BucketSource: siteBucket,
-            },
-            behaviors: [{ isDefaultBehavior: true }],
-          },
-        ],
-      },
-    );
-
-    return {
-      siteBucket,
-      cloudfrontDistribution,
-    };
-  }
-
   private configureSecuritygroup(vpc: cdk.aws_ec2.Vpc) {
     const securityGroup = new ec2.SecurityGroup(
       this,
@@ -282,6 +246,42 @@ export class AwsAppsyncStack extends cdk.Stack {
       typeName: 'Query',
       fieldName: 'getUserInformationById',
     });
+  }
+
+  private configureFrontendHosting() {
+    const siteBucket = new s3.Bucket(this, 'SiteBucket', {
+      bucketName: 'product-reviews-site-bucket',
+      websiteIndexDocument: 'index.html',
+      websiteErrorDocument: 'index.html',
+      publicReadAccess: true,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
+      accessControl: s3.BucketAccessControl.BUCKET_OWNER_FULL_CONTROL,
+    });
+
+    new s3deploy.BucketDeployment(this, 'DeployWebsite', {
+      sources: [s3deploy.Source.asset('frontend/dist')],
+      destinationBucket: siteBucket,
+    });
+
+    const cloudfrontDistribution = new cloudfront.CloudFrontWebDistribution(
+      this,
+      'SiteDistribution',
+      {
+        originConfigs: [
+          {
+            s3OriginSource: {
+              s3BucketSource: siteBucket,
+            },
+            behaviors: [{ isDefaultBehavior: true }],
+          },
+        ],
+      },
+    );
+
+    return {
+      siteBucket,
+      cloudfrontDistribution,
+    };
   }
 
   private logStuff(
