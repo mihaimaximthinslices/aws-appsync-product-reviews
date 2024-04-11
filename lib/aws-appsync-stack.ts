@@ -63,7 +63,7 @@ export class AwsAppsyncStack extends cdk.Stack {
 
     securityGroup.addIngressRule(
       ec2.Peer.ipv4(process.env.LOCAL_IP_ADDRESS || ''),
-      ec2.Port.tcp(5432), // Assuming PostgreSQL. Adjust the port if using a different database engine.
+      ec2.Port.tcp(5432),
       'Allow inbound traffic from my IP address on port 5432',
     );
     return securityGroup;
