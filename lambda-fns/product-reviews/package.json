@@ -11,6 +11,7 @@
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.552.0",
     "@prisma/client": "^5.12.1",
+    "amazon-cognito-identity-js": "^6.3.12",
     "prisma": "^5.12.1"
   },
   "devDependencies": {

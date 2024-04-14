@@ -28,14 +28,14 @@ export class AwsAppsyncStack extends cdk.Stack {
 
     const api = this.configureGraphQlApi(userPool);
 
-    const { userQueriesLambda, productReviewsLambdaDs } =
-      this.configureProductReviewsLambda(vpc, securityGroup, db, api);
-
-    const userQueriesLambdaDs = this.configureUserQueriesLambda(
-      userQueriesLambda,
-      userPool,
+    const productReviewsLambdaDs = this.configureProductReviewsLambda(
+      vpc,
+      securityGroup,
+      db,
       api,
     );
+
+    const userQueriesLambdaDs = this.configureUserQueriesLambda(userPool, api);
 
     this.configureGraphQlResolvers(productReviewsLambdaDs, userQueriesLambdaDs);
 
@@ -60,12 +60,6 @@ export class AwsAppsyncStack extends cdk.Stack {
         vpc,
       },
     );
-
-    securityGroup.addIngressRule(
-      ec2.Peer.ipv4(process.env.LOCAL_IP_ADDRESS || ''),
-      ec2.Port.tcp(5432),
-      'Allow inbound traffic from my IP address on port 5432',
-    );
     return securityGroup;
   }
 
@@ -80,7 +74,7 @@ export class AwsAppsyncStack extends cdk.Stack {
       publiclyAccessible: true,
       instanceType: ec2.InstanceType.of(
         ec2.InstanceClass.T4G,
-        ec2.InstanceSize.MEDIUM,
+        ec2.InstanceSize.MICRO,
       ),
       vpc,
       vpcSubnets: {
@@ -164,31 +158,26 @@ export class AwsAppsyncStack extends cdk.Stack {
       productReviewsLambda,
     );
 
+    return productReviewsLambdaDs;
+  }
+
+  private configureUserQueriesLambda(
+    userPool: cdk.aws_cognito.UserPool,
+    api: cdk.aws_appsync.GraphqlApi,
+  ) {
+    const userPoolArn = `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/${userPool.userPoolId}`;
+
     const userQueriesLambda = new lambda.Function(
       this,
       'product-reviews-lambda-user-queries',
       {
         runtime: lambda.Runtime.NODEJS_20_X,
         handler: 'main.handler',
-        vpc: vpc,
-        vpcSubnets: {
-          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-        },
-        securityGroups: [securityGroup],
         code: lambda.Code.fromAsset('lambda-fns/user-queries'),
         memorySize: 1024,
         timeout: cdk.Duration.minutes(5),
       },
     );
-    return { userQueriesLambda, productReviewsLambdaDs };
-  }
-
-  private configureUserQueriesLambda(
-    userQueriesLambda: cdk.aws_lambda.Function,
-    userPool: cdk.aws_cognito.UserPool,
-    api: cdk.aws_appsync.GraphqlApi,
-  ) {
-    const userPoolArn = `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/${userPool.userPoolId}`;
 
     userQueriesLambda.addToRolePolicy(
       new iam.PolicyStatement({

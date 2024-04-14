@@ -12,6 +12,7 @@ exports.handler = async (event: any) => {
     return {
       id: user.Username,
       email: user.Attributes?.find((attr) => attr.Name === 'email')?.Value,
+      status: user.UserStatus,
     };
   }
   return null;
@@ -23,7 +24,11 @@ async function getUser(userId: string, userPoolId: string) {
     Filter: `sub = "${userId}"`,
   };
 
+  console.log('params', params);
+
   const response = await cognito.listUsers(params).promise();
+
+  console.log('response', response);
   if (!response || !response.Users) {
     throw new Error(`User with id "${userId}" not found`);
   }

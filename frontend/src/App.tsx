@@ -1,21 +1,19 @@
-import reactLogo from './assets/react.svg';
-import viteLogo from '/vite.svg';
-import './App.css';
+import { createContext, useState } from 'react';
+import { RouterProvider } from 'react-router-dom';
+import { router } from './router';
 
-function App() {
+export const PasswordContext = createContext({
+  password: '',
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  setPassword: (_password: string) => {},
+});
+
+export function App() {
+  const [password, setPassword] = useState('');
+
   return (
-    <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Welcome to the product reviews website, work in progress...</h1>
-    </>
+    <PasswordContext.Provider value={{ password, setPassword }}>
+      <RouterProvider router={router} />
+    </PasswordContext.Provider>
   );
 }
-
-export default App;
